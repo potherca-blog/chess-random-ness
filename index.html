@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CRN - Chess Random Ness</title>
+  <link rel="icon"
+    href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='0' y='14'>♟️</text></svg>">
+
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code&family=Roboto&family=Press+Start+2P&family=Ubuntu+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    html, body {
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    table th {
+      font-family: 'Ubuntu Mono', monospace;
+      text-align: center;
+      width: min-content;
+    }
+
+    table td {
+      font-family: 'Press Start 2P', cursive;
+      text-align: right;
+    }
+
+    th a {
+      color: black;
+      font-size: 80%;
+    }
+
+    th, td {
+      border-bottom: 1px solid;
+      border-right: 1px solid;
+    }
+
+    th:first-child, td:first-child {
+      border-left: 1px solid;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+
+<form onsubmit="return false">
+  <button data-on-true="⏸" data-on-false="▶" name="play" title="Play ▶ or Pause ⏸ game">️</button>
+  <button data-on-true="🙈" data-on-false="🐵" name="show-board" title="Show 🐵 or hide 🙈 the chess board"></button>
+  <button data-on-true="🔁" data-on-false="🏆" name="stop-on-win"
+    title="Keep playing 🔁 or stop when a player wins 🏆"></button>
+</form>
+
+<div id="myBoard" style="width: min(75vw, 75vh)"></div>
+
+<table>
+  <thead>
+    <tr>
+      <th colspan="2">Wins</th>
+      <th colspan="4">Draws</th>
+      <th colspan="3">Games</th>
+    </tr>
+    <tr>
+      <th>♚</th>
+      <th>♔</th>
+      <th><a href="https://en.wikipedia.org/wiki/Fifty-move_rule">Fifty-move Rule</a></th>
+      <th><a href="https://en.wikipedia.org/wiki/Glossary_of_chess#insufficient_material">Insufficient Material</a></th>
+      <th><a href="https://en.wikipedia.org/wiki/Stalemate">Stalemate</a></th>
+      <th><a href="https://en.wikipedia.org/wiki/Threefold_repetition">Threefold Repetition</a></th>
+      <th>Total</th>
+      <th>Moves</th>
+      <th>Average</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="win-black"></td>
+      <td class="win-white"></td>
+      <td class="draw-fifty-move-rule"></td>
+      <td class="draw-insufficient-material"></td>
+      <td class="draw-stalemate"></td>
+      <td class="draw-threefold-repetition"></td>
+      <td class="games-total"></td>
+      <td class="games-moves"></td>
+      <td class="games-average"></td>
+    </tr>
+  </tbody>
+</table>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
+
+<script>
+  const config = {
+    "board-speed": 50,
+    "play": true,
+    "show-board": true,
+    "speed": -1,
+    "stop-on-win": false,
+  }
+
+  const board = Chessboard('myBoard', {
+    "appearSpeed": config["board-speed"],
+    "moveSpeed": config["board-speed"],
+    "pieceTheme": 'https://cdn.jsdelivr.net/gh/oakmac/chessboardjs/website/img/chesspieces/alpha/{piece}.png',
+    "position": 'start',
+    "snapbackSpeed": config["board-speed"],
+    "snapSpeed": config["board-speed"],
+    "trashSpeed": config["board-speed"],
+  })
+
+  const elements = {
+    "games-total": document.querySelector('.games-total'),
+    "games-moves": document.querySelector('.games-moves'),
+    "games-average": document.querySelector('.games-average'),
+    "win-black": document.querySelector('.win-black'),
+    "win-white": document.querySelector('.win-white'),
+    "draw-fifty-move-rule": document.querySelector('.draw-fifty-move-rule'),
+    "draw-insufficient-material": document.querySelector('.draw-insufficient-material'),
+    "draw-stalemate": document.querySelector('.draw-stalemate'),
+    "draw-threefold-repetition": document.querySelector('.draw-threefold-repetition'),
+  }
+
+  const chess = new Chess()
+
+  const stats = {
+    draw: {
+      "fifty-move-rule": 0,
+      "insufficient-material": 0,
+      "stalemate": 0,
+      "threefold-repetition": 0,
+    },
+    games: [],
+    win: {black: 0, white: 0}
+  }
+
+  function handleButtonToggle(event) {
+    const input = event.target
+    const value = JSON.parse(input.value)
+
+    input.value = ! value
+
+    config[input.name] = ! value
+
+    if (input.name === 'show-board') {
+      const board = document.querySelector('#myBoard');
+      const display = board.style.display
+
+      board.style.display = display === 'none'
+        ? 'block'
+        : 'none'
+    }
+
+    setButtonText(input)
+  }
+
+  function handleGameOver() {
+
+    stats.games.push(chess.history().length)
+
+    if (chess.in_draw()) {
+      let reason
+
+      if (chess.in_stalemate()) {
+        reason = 'stalemate'
+      } else if (chess.in_threefold_repetition()) {
+        reason = 'threefold-repetition'
+      } else if (chess.insufficient_material()) {
+        reason = 'insufficient-material'
+      } else {
+        reason = 'fifty-move-rule'
+      }
+
+      stats.draw[reason]++
+    } else if (chess.in_checkmate()) {
+      if (chess.turn() === 'b') {
+        stats.win.white++
+      } else {
+        stats.win.black++
+      }
+    } else {
+      throw new Error('Game over, but neither checkmate nor draw')
+    }
+
+    updateStatsTable()
+  }
+
+  function getRandomMove(length) {
+    let randomMove
+    /*/ @TODO: Getting randomness from a back-end goes here!
+     *
+     * As it would be to load-heavy to call the backend for every move, it should
+     * return a list of random numbers.  [how many? 100 / 500 / 1000 / ?]
+     * the list will be used in order, once the list is exhausted, a new list
+     * will be retrieved from the backend.
+     *
+    /*/
+    randomMove = Math.floor(Math.random() * length)
+
+    return randomMove;
+  }
+
+  function makeRandomMove() {
+    const possibleMoves = chess.moves()
+
+    // Handle end of game
+    if (chess.game_over()) {
+      handleGameOver();
+      if (config["stop-on-win"] && chess.in_checkmate()) {
+        board.position(chess.fen())
+        // @TODO: Stop gameplay, toggle play/pause button
+        return
+      }
+
+      chess.clear()
+      chess.reset()
+    }
+
+    // Make a random move
+    const randomIdx = getRandomMove(possibleMoves.length);
+    chess.move(possibleMoves[randomIdx])
+
+    // Update the board
+    if (config["show-board"]) {
+      board.position(chess.fen())
+    }
+
+    // Wait for the next move
+    let timeout;
+
+    if(config.speed === -1) {
+      timeout = possibleMoves.length
+    } else if (config["show-board"] === false) {
+      timeout = 1
+    } else {
+      timeout = config.speed;
+    }
+
+    window.setTimeout(makeRandomMove, timeout)
+  }
+
+  function updateStatsTable() {
+    const moves = stats.games.reduce((a, b) => a + b, 0);
+
+    elements['games-total'].innerText = stats.games.length
+    elements['games-moves'].innerText = moves
+    elements['games-average'].innerText = Math.round(moves / stats.games.length) || 0
+    elements['win-black'].innerText = stats.win.black
+    elements['win-white'].innerText = stats.win.white
+    elements['draw-fifty-move-rule'].innerText = stats.draw["fifty-move-rule"]
+    elements['draw-insufficient-material'].innerText = stats.draw["insufficient-material"]
+    elements['draw-stalemate'].innerText = stats.draw.stalemate
+    elements['draw-threefold-repetition'].innerText = stats.draw["threefold-repetition"]
+
+    console.log(stats)
+  }
+
+  function setButtonText(input) {
+    input.innerText = input.dataset['on' + input.value.charAt(0).toUpperCase() + input.value.slice(1)]
+
+  }
+
+  Object.entries(config).forEach(([name, value]) => {
+    const input = document.querySelector(`[name=${name}]`)
+    if (input) {
+      input.value = JSON.stringify(value)
+      setButtonText(input);
+      input.addEventListener('click', handleButtonToggle)
+    }
+  })
+
+  window.addEventListener('resize', board.resize);
+
+  updateStatsTable()
+
+  makeRandomMove()
+
+</script>
+</body>
+</html>
