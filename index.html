@@ -211,8 +211,6 @@
   }
 
   function makeRandomMove() {
-    const possibleMoves = chess.moves()
-
     // Handle end of game
     if (chess.game_over()) {
       handleGameOver();
@@ -227,6 +225,7 @@
     }
 
     // Make a random move
+    const possibleMoves = chess.moves()
     const randomIdx = getRandomMove(possibleMoves.length);
     chess.move(possibleMoves[randomIdx])
 
